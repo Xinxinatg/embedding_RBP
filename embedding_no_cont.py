@@ -317,7 +317,7 @@ def main():
   # train_data,train_label=data[:6011].double(),label[:6011]
   final_test_data,final_test_label=data[-int(teP)-int(teN):].double(),label[-int(teP)-int(teN):]
   final_test_data=final_test_data.to(device)
-  logits=net.trainModel(final_test_data)
+  logits=net(final_test_data)
   # logits_output=os.path.split(rep_file)[1].replace('.csv','_logtis.csv')
   logits_cpu=logits.cpu().detach().numpy()
   logits_cpu_pd=pd.DataFrame(logits_cpu)
