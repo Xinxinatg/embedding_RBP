@@ -224,7 +224,7 @@ def main():
   optimizer = torch.optim.Adam(net.parameters(), lr=args.learning_rate,weight_decay=5e-4)
   # criterion = ContrastiveLoss()
   # criterion_model = nn.CrossEntropyLoss(reduction='sum')
-  lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,patience=10, verbose=True)
+  lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,patience=10, factor=0.75,verbose=True)
 # https://discuss.pytorch.org/t/reducelronplateau-not-doing-anything/24575/10
   criterion_model = nn.CrossEntropyLoss(weight=weig,reduction='mean')
   best_bacc=0
