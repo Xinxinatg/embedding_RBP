@@ -13,7 +13,7 @@ import time
 import pickle
 import pandas as pd
 from termcolor import colored
-from sklearn.metrics import accuracy_score,balanced_accuracy_score
+from sklearn.metrics import accuracy_score,balanced_accuracy_score,precision_recall_curve,auc
 import os
 import tensorflow as tf
 import numpy as np
@@ -52,7 +52,7 @@ test_data,test_label=data[int(trP)+int(trN):-int(teP)-int(teN)].double(),label[i
 LOSS_WEIGHT_POSITIVE = (int(trP)+int(trN)) / (2.0 * int(trP)) 
 LOSS_WEIGHT_NEGATIVE = (int(trP)+int(trN)) / (2.0 * int(trN)) 
 # https://towardsdatascience.com/deep-learning-with-weighted-cross-entropy-loss-on-imbalanced-tabular-data-using-fastai-fe1c009e184c
-
+soft_max=nn.Softmax(dim=1)
 # class_weights=torch.FloatTensor([w_0, w_1]).cuda()
 weig=torch.FloatTensor([LOSS_WEIGHT_NEGATIVE,LOSS_WEIGHT_POSITIVE]).double().cuda()
 # train_data,train_label=genData("./train_peptide.csv",260)
@@ -142,9 +142,9 @@ class newModel2(nn.Module):
         # self.gmlp_t=gMLP(num_tokens = 1000,dim = 32, depth = 2,  seq_len = 40, act = nn.Tanh())
         # self.gru = nn.GRU(self.emb_dim, self.hidden_dim, num_layers=4, 
         #                        bidirectional=True, dropout=0.2)
-        self.c1_1 = nn.Conv1d(44, 256, 1)
-        self.c1_2 = nn.Conv1d(44, 256, 3)
-        self.c1_3 = nn.Conv1d(44, 256, 5)
+        self.c1_1 = nn.Conv1d(32, 256, 1)
+        self.c1_2 = nn.Conv1d(32, 256, 3)
+        self.c1_3 = nn.Conv1d(32, 256, 5)
         self.p1 = nn.MaxPool1d(3, stride=3)     
         self.c2 = nn.Conv1d(256, 128, 3)
         self.p2 = nn.MaxPool1d(3, stride=3)  
@@ -152,7 +152,10 @@ class newModel2(nn.Module):
         # self.p3 = nn.MaxPool1d(3, stride=1)       
         self.drop=nn.Dropout(p=0.01)
         self.block2=nn.Sequential(        
-                                               nn.Linear(128,64),
+                                               nn.Linear(896,512),
+                                               nn.BatchNorm1d(512),
+                                               nn.LeakyReLU(),
+                                               nn.Linear(512,64),
                                                nn.BatchNorm1d(64),
                                                nn.LeakyReLU(),
                                                nn.Linear(64,2)
@@ -162,7 +165,7 @@ class newModel2(nn.Module):
         # x=self.embedding(x)
         # output=self.transformer_encoder(x).permute(1, 0, 2)
         # output=self.gmlp_t(x).permute(1, 0, 2)
-        x=x.view(x.shape[0],44,14)
+        x=x.view(x.shape[0],32,32)
         # x=x.transpose(1,2)
         # output=self.gmlp_t(x).permute(1, 0, 2)
         # print(output.shape)
@@ -260,12 +263,15 @@ def main():
       net.load_state_dict(state_dict['model'])
   # lr = 0.0001
   optimizer = torch.optim.Adam(net.parameters(), lr=args.learning_rate,weight_decay=5e-4)
+  lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,patience=5, factor=0.75,verbose=True)
+# https://discuss.pytorch.org/t/reducelronplateau-not-doing-anything/24575/10
   # criterion = ContrastiveLoss()
   # criterion_model = nn.CrossEntropyLoss(reduction='sum')
   
 
   criterion_model = nn.CrossEntropyLoss(weight=weig,reduction='mean')
   best_bacc=0
+  best_aupr=0
   EPOCH=args.epoch
   CUDA_LAUNCH_BLOCKING=1
   for epoch in range(EPOCH):
@@ -284,7 +290,7 @@ def main():
               loss.backward()
               optimizer.step()
               loss_ls.append(loss.item())
-
+      lr_scheduler.step(loss)
 
       if epoch %100 ==0:
             torch.save({
@@ -299,15 +305,17 @@ def main():
           test_logits=net(test_data_gpu)
           outcome=np.argmax(test_logits.detach().cpu(), axis=1)
           test_bacc=balanced_accuracy_score(test_label, outcome)
+          precision, recall, thresholds = precision_recall_curve(test_label, soft_max(test_logits.cpu())[:,1])
+          test_aupr = auc(recall, precision)
       results=f"epoch: {epoch+1}, loss: {np.mean(loss_ls):.5f}\n"
       # results=f"epoch: {epoch+1}\n"
-      results+=f'\ttrain_acc: {train_acc:.4f}, test_bacc: {colored(test_bacc,"red")}, time: {time.time()-t0:.2f}'
+      results+=f'\ttrain_acc: {train_acc:.4f}, test_aupr: {colored(test_aupr,"red")},test_bacc: {colored(test_bacc,"red")}, time: {time.time()-t0:.2f}'
       print(results)
       to_log(results)
-      if test_bacc>best_bacc:
-          best_bacc=test_bacc
-          torch.save({"best_bacc":best_bacc,"model":net.state_dict(),'args':args},model_loc)
-          print(f"best_bacc: {best_bacc}")
+      if test_aupr>best_aupr:
+          best_aupr=test_aupr
+          torch.save({"best_aupr":best_aupr,"model":net.state_dict(),'args':args},model_loc)
+          print(f"best_aupr: {best_aupr}")
   state_dict=torch.load(model_loc)
 # state_dict=torch.load('/content/Model/pretrain.pl')
   net.load_state_dict(state_dict['model'])
@@ -345,8 +353,11 @@ def main():
   MCC=(TP*TN-FN*FP)/math.sqrt((TP+FN)*(TN+FP)*(TP+FP)*(TN+FN))
   acc = accuracy_score(final_test_label, outcome)
   bacc=balanced_accuracy_score(final_test_label, outcome)
-  print('SN,SP,F_value,MCC,acc,bacc')
-  print(SN,SP,F_value,MCC,acc,bacc)
+  precision1, recall1, thresholds1 = precision_recall_curve(final_test_label, soft_max(torch.tensor(logits_cpu))[:,1])
+  final_test_aupr = auc(recall1, precision1)
+  # final_test_aupr=0
+  print('SN,SP,F_value,MCC,acc,bacc,final_test_aupr')
+  print(SN,SP,F_value,MCC,acc,bacc,final_test_aupr)
 if __name__ == '__main__':
     CUDA_LAUNCH_BLOCKING=1
     main()
