@@ -13,7 +13,7 @@ import time
 import pickle
 import pandas as pd
 from termcolor import colored
-from sklearn.metrics import accuracy_score,balanced_accuracy_score,precision_recall_curve,auc
+from sklearn.metrics import accuracy_score,balanced_accuracy_score,precision_recall_curve,auc,roc_auc_score
 import os
 import tensorflow as tf
 import numpy as np
@@ -355,9 +355,10 @@ def main():
   bacc=balanced_accuracy_score(final_test_label, outcome)
   precision1, recall1, thresholds1 = precision_recall_curve(final_test_label, soft_max(torch.tensor(logits_cpu))[:,1])
   final_test_aupr = auc(recall1, precision1)
+  final_auc_roc=roc_auc_score(final_test_label, soft_max(torch.tensor(logits_cpu))[:,1])
   # final_test_aupr=0
-  print('SN,SP,F_value,MCC,acc,bacc,final_test_aupr')
-  print(SN,SP,F_value,MCC,acc,bacc,final_test_aupr)
+  print('bacc,MCC,final_test_aupr,final_auc_roc')
+  print(bacc,MCC,final_test_aupr,final_auc_roc)
 if __name__ == '__main__':
     CUDA_LAUNCH_BLOCKING=1
     main()
