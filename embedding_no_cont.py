@@ -320,7 +320,7 @@ def main():
 
 # state_dict=torch.load('/content/Model/pretrain.pl')
   net.load_state_dict(state_dict['model'])
-  pro=pd.read_csv(args.pro_label_dir)
+  pro=pd.read_csv(model_loc)
   label=torch.tensor(pro['label'].values)
   # final_test_data,final_test_label=data[9655+1068:].double(),label[9655+1068:]
   # train_data,train_label=data[:6011].double(),label[:6011]
