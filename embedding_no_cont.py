@@ -316,11 +316,11 @@ def main():
           best_aupr=test_aupr
           torch.save({"best_aupr":best_aupr,"model":net.state_dict(),'args':args},model_loc)
           print(f"best_aupr: {best_aupr}")
-  state_dict=torch.load(args.load_model_dir)
+  state_dict=torch.load(model_loc)
 
 # state_dict=torch.load('/content/Model/pretrain.pl')
   net.load_state_dict(state_dict['model'])
-  pro=pd.read_csv(model_loc)
+  pro=pd.read_csv(args.pro_label_dir)
   label=torch.tensor(pro['label'].values)
   # final_test_data,final_test_label=data[9655+1068:].double(),label[9655+1068:]
   # train_data,train_label=data[:6011].double(),label[:6011]
