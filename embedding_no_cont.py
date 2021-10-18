@@ -316,7 +316,8 @@ def main():
           best_aupr=test_aupr
           torch.save({"best_aupr":best_aupr,"model":net.state_dict(),'args':args},model_loc)
           print(f"best_aupr: {best_aupr}")
-  state_dict=torch.load(model_loc)
+  state_dict=torch.load(args.load_model_dir)
+
 # state_dict=torch.load('/content/Model/pretrain.pl')
   net.load_state_dict(state_dict['model'])
   pro=pd.read_csv(args.pro_label_dir)
@@ -325,7 +326,9 @@ def main():
   # train_data,train_label=data[:6011].double(),label[:6011]
   final_test_data,final_test_label=data[-int(teP)-int(teN):].double(),label[-int(teP)-int(teN):]
   final_test_data=final_test_data.to(device)
-  logits=net(final_test_data)
+  net.eval() 
+  with torch.no_grad(): 
+      logits=net(final_test_data)
   # logits_output=os.path.split(rep_file)[1].replace('.csv','_logtis.csv')
   logits_cpu=logits.cpu().detach().numpy()
   logits_cpu_pd=pd.DataFrame(logits_cpu)
