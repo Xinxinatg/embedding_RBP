@@ -15,9 +15,9 @@ import pandas as pd
 from termcolor import colored
 from sklearn.metrics import accuracy_score,balanced_accuracy_score,precision_recall_curve,auc,roc_auc_score
 import os
-import tensorflow as tf
+# import tensorflow as tf
 import numpy as np
-from sklearn.metrics import accuracy_score,balanced_accuracy_score
+from sklearn.metrics import accuracy_score,balanced_accuracy_score, matthews_corrcoef
 import math
 
 parser = argparse.ArgumentParser(description='embeddings_for_RBP_prediction')
@@ -331,26 +331,8 @@ def main():
   logits_cpu_pd=pd.DataFrame(logits_cpu)
   logits_cpu_pd.to_csv(logits_output,index=False)
   outcome=np.argmax(logits.cpu().detach().numpy(), axis=1)
-  tp= tf.keras.metrics.TruePositives()
-  tn = tf.keras.metrics.TrueNegatives()
-  fp = tf.keras.metrics.FalsePositives()
-  fn = tf.keras.metrics.FalseNegatives()
-  # print(final_test_label.device)
-  tp.update_state(outcome, final_test_label)
-  TP=tp.result().numpy()
 
-  tn.update_state(outcome, final_test_label)
-  TN=tn.result().numpy()
-
-  fp.update_state(outcome, final_test_label)
-  FP=fp.result().numpy()
-
-  fn.update_state(outcome, final_test_label)
-  FN=fn.result().numpy()
-  SN=TP/(TP+FN)
-  SP=TN/(TN+FP)
-  F_value=2*TP/(2*TP+FP+FN)
-  MCC=(TP*TN-FN*FP)/math.sqrt((TP+FN)*(TN+FP)*(TP+FP)*(TN+FN))
+  MCC= matthews_corrcoef(final_test_label, outcome)
   acc = accuracy_score(final_test_label, outcome)
   bacc=balanced_accuracy_score(final_test_label, outcome)
   precision1, recall1, thresholds1 = precision_recall_curve(final_test_label, soft_max(torch.tensor(logits_cpu))[:,1])
